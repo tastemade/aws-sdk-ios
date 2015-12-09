@@ -19,5 +19,5 @@ Pod::Spec.new do |s|
   s.dependency 'AWSCore', '2.3.1'
 
   s.source_files = 'AWSMobileAnalytics/*.{h,m}', 'AWSMobileAnalytics/**/*.{h,m}'
-  s.private_header_files = 'AWSMobileAnalytics/Internal/*.h'
+  #s.private_header_files = 'AWSMobileAnalytics/Internal/*.h'
 end
