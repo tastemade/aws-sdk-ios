@@ -1,17 +1,17 @@
-/*
- Copyright 2010-2015 Amazon.com, Inc. or its affiliates. All Rights Reserved.
-
- Licensed under the Apache License, Version 2.0 (the "License").
- You may not use this file except in compliance with the License.
- A copy of the License is located at
-
- http://aws.amazon.com/apache2.0
-
- or in the "license" file accompanying this file. This file is distributed
- on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- express or implied. See the License for the specific language governing
- permissions and limitations under the License.
- */
+//
+// Copyright 2010-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License").
+// You may not use this file except in compliance with the License.
+// A copy of the License is located at
+//
+// http://aws.amazon.com/apache2.0
+//
+// or in the "license" file accompanying this file. This file is distributed
+// on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+// express or implied. See the License for the specific language governing
+// permissions and limitations under the License.
+//
 
 #if !AWS_TEST_BJS_INSTEAD
 
@@ -110,37 +110,39 @@ static NSString *testStreamName = nil;
     XCTAssertEqual([kinesisRecorder class], [AWSKinesisRecorder class]);
     [AWSKinesisRecorder removeKinesisRecorderForKey:@"AWSKinesisRecorderTests.testConstructors"];
     XCTAssertNil([AWSKinesisRecorder KinesisRecorderForKey:@"AWSKinesisRecorderTests.testConstructors"]);
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-    kinesisRecorder = [[AWSKinesisRecorder alloc] initWithConfiguration:serviceConfiguration
-                                                             identifier:@"Some random string"];
-#pragma clang diagnostic pop
-
-    XCTAssertNotNil(kinesisRecorder);
-    XCTAssertEqual([kinesisRecorder class], [AWSKinesisRecorder class]);
 }
 
 - (void)testSaveLargeData {
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Test finished running."];
+
     NSMutableString *mutableString = [NSMutableString new];
-    for (int i = 0; i < 5100; i++) {
+    for (int i = 0; i < 30000; i++) {
         [mutableString appendString:@"0123456789"];
     }
     NSData *data = [mutableString dataUsingEncoding:NSUTF8StringEncoding];
-    XCTAssertGreaterThan([data length], 50 * 1024 - 256);
+    XCTAssertGreaterThan([data length], 256 * 1024 - 256);
     AWSKinesisRecorder *kinesisRecorder = [AWSKinesisRecorder defaultKinesisRecorder];
     [[[kinesisRecorder saveRecord:data
-                     streamName:@"testSaveLargeData"] continueWithBlock:^id(AWSTask *task) {
+                       streamName:@"testSaveLargeData"] continueWithBlock:^id(AWSTask *task) {
         XCTAssertNil(task.result);
         XCTAssertNil(task.exception);
         XCTAssertNotNil(task.error);
         XCTAssertEqualObjects(task.error.domain, AWSKinesisRecorderErrorDomain);
         XCTAssertEqual(task.error.code, AWSKinesisRecorderErrorDataTooLarge);
         return [kinesisRecorder removeAllRecords];
-    }] waitUntilFinished];
+    }] continueWithBlock:^id _Nullable(AWSTask * _Nonnull task) {
+        [expectation fulfill];
+        return nil;
+    }];
+
+    [self waitForExpectationsWithTimeout:10 handler:^(NSError * _Nullable error) {
+        XCTAssertNil(error);
+    }];
 }
 
 - (void)testRemoveAllRecords {
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Test finished running."];
+
     NSMutableString *mutableString = [NSMutableString new];
     for (int i = 0; i < 5000; i++) {
         [mutableString appendString:@"0123456789"];
@@ -157,16 +159,25 @@ static NSString *testStreamName = nil;
         }];
     }
 
-    [[[task continueWithBlock:^id(AWSTask *task) {
+    [[task continueWithBlock:^id(AWSTask *task) {
         XCTAssertGreaterThan(kinesisRecorder.diskBytesUsed, 500000);
         return [kinesisRecorder removeAllRecords];
     }] continueWithBlock:^id(AWSTask *task) {
         XCTAssertLessThan(kinesisRecorder.diskBytesUsed, 13000);
+
+        [expectation fulfill];
+
         return nil;
-    }] waitUntilFinished];
+    }];
+
+    [self waitForExpectationsWithTimeout:10 handler:^(NSError * _Nullable error) {
+        XCTAssertNil(error);
+    }];
 }
 
 - (void)testDiskByteLimit {
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Test finished running."];
+
     __block BOOL byteThresholdReached = NO;
     [[NSNotificationCenter defaultCenter] addObserverForName:AWSKinesisRecorderByteThresholdReachedNotification
                                                       object:nil
@@ -196,13 +207,20 @@ static NSString *testStreamName = nil;
         }];
     }
 
-    [[[task continueWithBlock:^id(AWSTask *task) {
+    [[task continueWithBlock:^id(AWSTask *task) {
         XCTAssertLessThan(kinesisRecorder.diskBytesUsed, 1.2 * 1024 * 1024); // Less than 1.2MB
         return [kinesisRecorder removeAllRecords];
     }] continueWithBlock:^id(AWSTask *task) {
         XCTAssertLessThan(kinesisRecorder.diskBytesUsed, 13000);
+
+        [expectation fulfill];
+
         return nil;
-    }] waitUntilFinished];
+    }];
+
+    [self waitForExpectationsWithTimeout:10 handler:^(NSError * _Nullable error) {
+        XCTAssertNil(error);
+    }];
 
     XCTAssertTrue(byteThresholdReached);
 
@@ -215,6 +233,8 @@ static NSString *testStreamName = nil;
 }
 
 - (void)testDiskAgeLimit {
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Test finished running."];
+
     NSMutableString *mutableString = [NSMutableString new];
     for (int i = 0; i < 5000; i++) {
         [mutableString appendString:@"0123456789"];
@@ -236,18 +256,27 @@ static NSString *testStreamName = nil;
         }];
     }
 
-    [[[task continueWithBlock:^id(AWSTask *task) {
+    [[task continueWithBlock:^id(AWSTask *task) {
         XCTAssertLessThan(kinesisRecorder.diskBytesUsed, 62000);
         return [kinesisRecorder removeAllRecords];
     }] continueWithBlock:^id(AWSTask *task) {
         XCTAssertLessThan(kinesisRecorder.diskBytesUsed, 13000);
+
+        [expectation fulfill];
+
         return nil;
-    }] waitUntilFinished];
+    }];
+
+    [self waitForExpectationsWithTimeout:10 handler:^(NSError * _Nullable error) {
+        XCTAssertNil(error);
+    }];
 
     kinesisRecorder.diskAgeLimit = 0.0;
 }
 
 - (void)testAll {
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Test finished running."];
+
     AWSKinesis *kinesis = [AWSKinesis defaultKinesis];
     AWSKinesisRecorder *kinesisRecorder = [AWSKinesisRecorder defaultKinesisRecorder];
 
@@ -259,11 +288,9 @@ static NSString *testStreamName = nil;
 
     NSMutableArray *returnedRecords = [NSMutableArray new];
 
-    [[[[[[[AWSTask taskForCompletionOfAllTasks:tasks] continueWithSuccessBlock:^id(AWSTask *task) {
-        sleep(10);
+    [[[[[[AWSTask taskForCompletionOfAllTasks:tasks] continueWithSuccessBlock:^id(AWSTask *task) {
         return [kinesisRecorder submitAllRecords];
     }] continueWithSuccessBlock:^id(AWSTask *task) {
-        sleep(10);
         AWSKinesisDescribeStreamInput *describeStreamInput = [AWSKinesisDescribeStreamInput new];
         describeStreamInput.streamName = testStreamName;
         return [kinesis describeStream:describeStreamInput];
@@ -296,8 +323,14 @@ static NSString *testStreamName = nil;
             XCTAssertTrue(i == 1234, @"Record count: %d", i);
         }
 
+        [expectation fulfill];
+
         return nil;
-    }] waitUntilFinished];
+    }];
+
+    [self waitForExpectationsWithTimeout:240 handler:^(NSError * _Nullable error) {
+        XCTAssertNil(error);
+    }];
 }
 
 - (AWSTask *)getRecords:(NSMutableArray *)returnedRecords shardIterator:(NSString *)shardIterator counter:(int32_t)counter {

@@ -1,17 +1,17 @@
-/*
- Copyright 2010-2015 Amazon.com, Inc. or its affiliates. All Rights Reserved.
-
- Licensed under the Apache License, Version 2.0 (the "License").
- You may not use this file except in compliance with the License.
- A copy of the License is located at
-
- http://aws.amazon.com/apache2.0
-
- or in the "license" file accompanying this file. This file is distributed
- on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- express or implied. See the License for the specific language governing
- permissions and limitations under the License.
- */
+//
+// Copyright 2010-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License").
+// You may not use this file except in compliance with the License.
+// A copy of the License is located at
+//
+// http://aws.amazon.com/apache2.0
+//
+// or in the "license" file accompanying this file. This file is distributed
+// on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+// express or implied. See the License for the specific language governing
+// permissions and limitations under the License.
+//
 
 #import "AWSMobileAnalyticsEventConstraintDecorator.h"
 #import "AWSMobileAnalyticsStringUtils.h"
@@ -54,8 +54,17 @@ static int const MAX_EVENT_ATTRIBUTE_VALUE_LENGTH = 200;
             {
                 NSString* trimmedKey = [AWSMobileAnalyticsEventConstraintDecorator trimKey:theKey forType:@"attribute"];
                 NSString* trimmedValued = [AWSMobileAnalyticsEventConstraintDecorator trimValue:theValue];
-                [self.decoratedEvent addAttribute:trimmedValued forKey:trimmedKey];
-                self.currentNumOfAttributesAndMetrics++;
+                if(trimmedKey.length > 0)
+                {
+                    [self.decoratedEvent addAttribute:trimmedValued forKey:trimmedKey];
+                    self.currentNumOfAttributesAndMetrics++;
+                }
+                else
+                {
+                    @throw [NSException exceptionWithName:NSInvalidArgumentException
+                                                   reason: [NSString stringWithFormat:@"Attribute key values must be between 1 and %0d characters long", MAX_EVENT_ATTRIBUTE_METRIC_KEY_LENGTH]
+                                                 userInfo:nil];
+                }
             }
         }
     }
@@ -71,8 +80,17 @@ static int const MAX_EVENT_ATTRIBUTE_VALUE_LENGTH = 200;
             if(self.currentNumOfAttributesAndMetrics < self.maxAttributesAndMetrics)
             {
                 NSString* trimmedKey = [AWSMobileAnalyticsEventConstraintDecorator trimKey:theKey forType:@"metric"];
-                [self.decoratedEvent addMetric:theValue forKey:trimmedKey];
-                self.currentNumOfAttributesAndMetrics++;
+                if(trimmedKey.length > 0)
+                {
+                    [self.decoratedEvent addMetric:theValue forKey:trimmedKey];
+                    self.currentNumOfAttributesAndMetrics++;
+                }
+                else
+                {
+                    @throw [NSException exceptionWithName:NSInvalidArgumentException
+                                                   reason: [NSString stringWithFormat:@"Metric key values must be between 1 and %0d characters long", MAX_EVENT_ATTRIBUTE_METRIC_KEY_LENGTH]
+                                                 userInfo:nil];
+                }
             }
         }
     }
